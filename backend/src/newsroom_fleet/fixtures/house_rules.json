@@ -1,0 +1,29 @@
+{
+  "house_rules": [
+    {
+      "rule_id": "hr_charged_not_guilty",
+      "title": "Charged is not guilty",
+      "pattern_terms": ["charg"],
+      "banned_terms": ["guilty"],
+      "severity": "high",
+      "guidance": "A defendant is charged, not guilty, unless convicted. Describe legal status precisely; never assert guilt for an unresolved case."
+    },
+    {
+      "rule_id": "hr_leak_corroboration",
+      "title": "Leak-sourced claims need corroboration",
+      "pattern_terms": ["leaked"],
+      "banned_terms": [],
+      "severity": "medium",
+      "guidance": "Claims resting on leaked material require independent corroboration before publication."
+    }
+  ],
+  "corrections_precedents": [
+    {
+      "precedent_id": "prec_2024_11_sales_tax",
+      "style_template": "Correction: An earlier version of this article reported {prior}. {authority} data now shows {current}. The article has been updated. We regret the error.",
+      "approved_by": "M. Okafor, Managing Editor",
+      "approved_at": "2024-11-20T10:00:00Z",
+      "provenance": "corrections-ledger/2024/11/sales-tax-rate.md"
+    }
+  ]
+}
