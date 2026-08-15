@@ -1,0 +1,61 @@
+[project]
+name = "newsroom-fleet"
+version = "0.1.0"
+description = "Institutional multi-agent verification system for local newsrooms"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+]
+
+# Fixture mode deliberately depends on none of this. `uv sync --extra cloud`
+# adds the Google stack; every module below is imported lazily behind an
+# interface, so the app still starts if the extra is absent.
+[project.optional-dependencies]
+cloud = [
+    "google-adk>=1.0",
+    "google-genai>=1.0",
+    "google-cloud-firestore>=2.19",
+    "google-cloud-pubsub>=2.23",
+    "google-cloud-modelarmor>=0.1",
+    "google-cloud-aiplatform>=1.70",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-gcp-trace>=1.7",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/newsroom_fleet"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Keep tmp dirs inside the repo: the machine-wide temp dir is not always writable.
+addopts = "--basetemp=.pytest_tmp"
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+
+[tool.ruff.lint]
+# BLE is on so every broad `except Exception` has to justify itself with a
+# noqa. They are all degradation paths — a cloud component falling back to its
+# local implementation — and none of them are on the publication decision path.
+select = ["E", "F", "I", "UP", "B", "ASYNC", "BLE", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Depends(...) in argument defaults is the FastAPI dependency-injection idiom.
+"src/newsroom_fleet/api/**" = ["B008"]

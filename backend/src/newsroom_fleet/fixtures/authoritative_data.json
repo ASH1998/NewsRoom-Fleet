@@ -1,0 +1,50 @@
+{
+  "datasets": {
+    "v1": {
+      "name": "State Labor Office release, March 2025 (initial)",
+      "records": [
+        {
+          "key": "harborview_unemployment_mar2025",
+          "keywords": ["unemployment"],
+          "value": "4.9",
+          "unit": "percent",
+          "locator": "state-labor.example.gov/releases/2025-03#unemployment_rate",
+          "authority": "State Labor Office",
+          "retrieved_at": "2025-04-05T09:00:00Z"
+        },
+        {
+          "key": "harborview_budget_total_fy2025",
+          "keywords": ["budget total", "city budget"],
+          "value": "212",
+          "unit": "million_usd",
+          "locator": "harborview.example.gov/finance/fy2025#total",
+          "authority": "Harborview Finance Department",
+          "retrieved_at": "2025-02-01T09:00:00Z"
+        }
+      ]
+    },
+    "v2": {
+      "name": "State Labor Office release, March 2025 (revised)",
+      "records": [
+        {
+          "key": "harborview_unemployment_mar2025",
+          "keywords": ["unemployment"],
+          "value": "5.1",
+          "unit": "percent",
+          "locator": "state-labor.example.gov/releases/2025-03-r1#unemployment_rate",
+          "authority": "State Labor Office",
+          "retrieved_at": "2025-06-02T09:00:00Z"
+        },
+        {
+          "key": "harborview_budget_total_fy2025",
+          "keywords": ["budget total", "city budget"],
+          "value": "212",
+          "unit": "million_usd",
+          "locator": "harborview.example.gov/finance/fy2025#total",
+          "authority": "Harborview Finance Department",
+          "retrieved_at": "2025-02-01T09:00:00Z"
+        }
+      ]
+    }
+  }
+}
