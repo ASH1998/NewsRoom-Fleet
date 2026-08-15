@@ -208,6 +208,75 @@ cloud component it did not actually construct.
 Defects 1 and 2 were invisible in the deploy output and only showed up in `/api/runtime`
 and a direct auth probe. That is the argument for the runtime view existing at all.
 
+| # | Date | Action | Type | Approved by | Est. cost | Actual | Running total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 14 | 2026-08-15 | Google Search grounding probes — 4 calls on `gemini-3.7-flash`, 3 of them grounded | API call | Ashutosh | ₹10–15 | ₹15 *(est.)* | ₹17 |
+
+**Running total: ₹17 of ₹10,000.**
+
+### Row 14 — what the grounding probes settled
+
+Grounded search is billed per query, so these were run once and the answers recorded here
+rather than re-probed.
+
+| Question | Answer |
+| --- | --- |
+| Does ADK allow `tools` + `output_schema`? | Yes in ADK 2.7 (it did not in 1.x) |
+| Does the **API** accept that combination? | Only with `tool_config.include_server_side_tool_invocations=True`; otherwise 400 |
+| With that flag on, is grounding metadata returned? | **No — zero grounding chunks.** Structured output, but nothing to verify a citation against |
+| Search-only, no schema? | **Yes** — search queries plus grounding chunks with the source domain in `web.title` (e.g. `pib.gov.in`) |
+| What is `web.uri`? | A `vertexaisearch.cloud.google.com/grounding-api-redirect/…` link, not the origin URL. `web.domain` is empty; the domain arrives in `web.title` |
+
+**Consequence for the design.** Single-hop grounded-plus-structured would let a desk emit a
+citation nothing can check — in the probe it returned a real-looking
+`https://pib.gov.in/PressReleasePage.aspx?PRID=2074360` with **no grounding chunks behind
+it**. That is precisely the hallucinated-citation failure the `broken_locator` guard exists
+to catch, and the guard would have had an empty allowlist to check against.
+
+So the grounded desk is two hops: search without a schema to obtain evidence *and* its
+grounding metadata, then structure that text with no tools, against an
+`allowed_locators` list built from the grounding chunks. Evidence-driven, not a preference.
+
+The probes also produced a real fact-check: the model correctly identified that 6.6% was
+the July–September **2023** figure and that the 2024 quarter was 6.4%, citing MoSPI/PIB.
+
+| # | Date | Action | Type | Approved by | Est. cost | Actual | Running total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 15 | 2026-08-15 | Grounded Data Checker development — 4 live runs, ~7 grounded queries | API call | Ashutosh | ₹20–30 | ₹25 *(est.)* | ₹42 |
+
+**Running total: ₹42 of ₹10,000.**
+
+### Row 15 — grounded fact-checking works, and three bugs it found
+
+Final run, two real claims with no fixture-adapter coverage:
+
+| Claim | Verdict | Citation |
+| --- | --- | --- |
+| India urban unemployment 4.2% (Jul–Sep 2024) | **contradicted** — source says 6.4% | `pib.gov.in` |
+| RBI held repo rate at 6.5% through 2024 | **verified** | `pib.gov.in` |
+
+The research for the first claim returned **two** sources — `affairscloud.com` and
+`pib.gov.in`. It cited the authoritative one. Had it cited the blog,
+`apply_authority_rule` would have downgraded the verdict to `unsupported` with an
+`unapproved_source` flag; that path is now covered by tests.
+
+**Bugs the live runs exposed:**
+
+1. **The adapter shadowed search.** Fixture keywords are broad by design
+   (`"unemployment"`), so a Harborview record was matched against an *India* claim and
+   search never ran. The desk correctly abstained, but on the wrong evidence. Now an
+   adapter `ABSTAIN` falls through to search.
+2. **Citations were unusable.** Grounding URIs are 100+ character opaque redirects, and
+   asking a model to copy one verbatim failed often enough that correct findings were
+   discarded by the citation guard. Sources now get short handles (`web_1`) which are
+   validated, then rewritten to the real URL for the editor.
+3. **Ungrounded prose read as research.** A hop-1 answer with no grounding chunks is the
+   model talking from memory. It now fails `usable` and produces an
+   `ungrounded_answer` abstention rather than feeding hop 2.
+
+Bug 2 is the interesting one: the guard was correct throughout and the *ergonomics* were
+wrong. Loosening the guard would have been the easy fix and the wrong one.
+
 ### What the live runs proved (rows 5–6)
 
 Run #1 surfaced a real routing defect. The model labelled *"the council voted 6-1"* as

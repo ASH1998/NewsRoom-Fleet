@@ -65,6 +65,7 @@ QUEUE_INPROCESS, QUEUE_PUBSUB = "inprocess", "pubsub"
 MEMORY_FILE, MEMORY_BANK = "file", "memory_bank"
 TRACING_OFF, TRACING_CONSOLE, TRACING_CLOUD = "off", "console", "cloud"
 PII_OFF, PII_GEMMA = "off", "gemma"
+GROUNDING_OFF, GROUNDING_SEARCH = "off", "search"
 
 
 def _env_flag(name: str, default: str) -> str:
@@ -81,6 +82,13 @@ class Settings:
     memory_backend: str = MEMORY_FILE
     tracing: str = TRACING_OFF
     pii_classifier: str = PII_OFF  # bounded Gemma bonus task at intake
+    # Google Search grounding for the Data Checker. Only meaningful in live
+    # mode, and billed per grounded query, so it is its own switch rather than
+    # something `mode=live` silently turns on.
+    grounding: str = GROUNDING_OFF
+    #: Extra domains this newsroom will let clear a claim, beyond
+    #: domain/authority.py's defaults.
+    authoritative_domains: tuple[str, ...] = ()
 
     # --- local runtime -----------------------------------------------------
     db_path: Path = _DEFAULT_DB_PATH
@@ -143,6 +151,7 @@ class Settings:
             "memory": self.memory_backend,
             "tracing": self.tracing,
             "pii_classifier": self.pii_classifier,
+            "grounding": self.grounding,
             "gcp_project": self.gcp_project,
             "gcp_location": self.gcp_location,
             "models": {
@@ -181,6 +190,17 @@ class Settings:
             memory_backend=_env_flag("NRF_MEMORY", MEMORY_BANK if cloud else MEMORY_FILE),
             tracing=_env_flag("NRF_TRACING", TRACING_CLOUD if cloud else TRACING_OFF),
             pii_classifier=_env_flag("NRF_PII", PII_GEMMA if cloud else PII_OFF),
+            # Defaults on in live mode: a fleet that cannot look anything up is
+            # the thing this switch exists to fix. Set NRF_GROUNDING=off to
+            # review without spending grounded queries.
+            grounding=_env_flag(
+                "NRF_GROUNDING", GROUNDING_SEARCH if mode == MODE_LIVE else GROUNDING_OFF
+            ),
+            authoritative_domains=tuple(
+                d.strip()
+                for d in (os.getenv("NRF_AUTHORITATIVE_DOMAINS") or "").split(",")
+                if d.strip()
+            ),
             db_path=Path(os.getenv("NRF_DB_PATH", str(_DEFAULT_DB_PATH))),
             desk_timeout_s=float(os.getenv("NRF_DESK_TIMEOUT_S", default_timeout)),
             desk_max_attempts=int(os.getenv("NRF_DESK_MAX_ATTEMPTS", "2")),

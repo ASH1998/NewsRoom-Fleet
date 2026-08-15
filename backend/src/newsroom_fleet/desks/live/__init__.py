@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from newsroom_fleet.config import Settings
+from newsroom_fleet.config import GROUNDING_SEARCH, Settings
 from newsroom_fleet.desks.base import DeskSet
 from newsroom_fleet.desks.live.extractor import LiveClaimExtractor
 from newsroom_fleet.desks.live.reviewers import (
@@ -21,22 +21,43 @@ from newsroom_fleet.desks.live.reviewers import (
 )
 from newsroom_fleet.desks.live.watcher import LiveCorrectionsWatcher
 from newsroom_fleet.domain.contracts import Desk
+from newsroom_fleet.security.screening import Screener
 
 log = logging.getLogger(__name__)
 
 __all__ = ["live_desk_set"]
 
 
-def live_desk_set(settings: Settings, *, fallback: DeskSet) -> DeskSet:
+def live_desk_set(
+    settings: Settings, *, fallback: DeskSet, screener: Screener | None = None
+) -> DeskSet:
     model = settings.gemini_model
+    implementation = "live"
+
+    data_checker: object = LiveDataChecker(model)
+    if settings.grounding == GROUNDING_SEARCH:
+        from newsroom_fleet.desks.live.grounded_data_checker import GroundedDataChecker
+        from newsroom_fleet.desks.live.grounding import GroundedResearcher
+
+        # The researcher screens what it finds, so it needs the same screener
+        # the intake gateway uses. It is not gaining evidence access — it is
+        # gaining the sanitiser that keeps fetched pages out of a desk's
+        # reasoning context.
+        data_checker = GroundedDataChecker(
+            model,
+            researcher=GroundedResearcher(model, screener=screener),
+            approved_domains=settings.authoritative_domains,
+        )
+        implementation = "live+search"
+
     return DeskSet(
         extractor=LiveClaimExtractor(model),
         aggregator=fallback.aggregator,  # deterministic by design, see module docstring
         watcher=LiveCorrectionsWatcher(model),
         workers={
             Desk.SOURCE_VERIFIER: LiveSourceVerifier(model),
-            Desk.DATA_CHECKER: LiveDataChecker(model),
+            Desk.DATA_CHECKER: data_checker,  # type: ignore[dict-item]
             Desk.STANDARDS_REVIEWER: LiveStandardsReviewer(model),
         },
-        implementation="live",
+        implementation=implementation,
     )

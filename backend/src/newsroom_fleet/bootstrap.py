@@ -121,8 +121,9 @@ def build_fleet(settings: Settings | None = None) -> Fleet:
     repo = _build_repository(settings, resolved)
     screener = _build_screener(settings, resolved)
     memory = _build_memory(settings, resolved)
-    desks = build_desk_set(settings)
+    desks = build_desk_set(settings, screener=screener)
     resolved["mode"] = desks.implementation
+    resolved["grounding"] = "search" if desks.implementation.endswith("+search") else "off"
 
     service = FleetService(settings, repo, screener, memory=memory, desks=desks)
 
