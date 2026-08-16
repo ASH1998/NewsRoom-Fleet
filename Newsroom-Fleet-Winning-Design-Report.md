@@ -58,7 +58,7 @@ The fleet must enforce information barriers that correspond to real editorial et
 | Desk | Permitted evidence | Decision responsibility |
 | --- | --- | --- |
 | Claim Extractor | Draft text only | Create atomic, checkable claims without deciding truth |
-| Source Verifier | Claim plus cited source | Determine whether the named source supports the claim |
+| Source Verifier | Claim plus cited source; when none is cited, screened web research under the approved-authority rule | Determine whether the cited source — or, if the reporter attached none, a source the desk found and an editor can open — supports the claim |
 | Data Checker | Claim plus approved authoritative adapter | Recompute or retrieve structured numeric evidence |
 | Standards Reviewer | Claim, house rules, corrections precedents | Detect legal-status, attribution, and standards risks |
 | Verdict Aggregator | Signed reviewer verdicts only | Resolve state without rewriting reviewer evidence |
@@ -68,7 +68,7 @@ The fleet must enforce information barriers that correspond to real editorial et
 
 ### The product truth boundary
 
-The system should make narrow claims that can be proven. It verifies whether a cited source supports a statement, checks selected numerical claims against explicit authoritative adapters, identifies defined standards risks, and records uncertainty. It does not claim universal truth detection, comprehensive legal review, or permission to publish autonomously.
+The system should make narrow claims that can be proven. It verifies whether a cited source supports a statement, checks selected numerical claims against explicit authoritative adapters, identifies defined standards risks, and records uncertainty. When a claim cites no source at all, the Source Verifier may research the web itself — but only an approved authority can clear the claim; corroboration from anywhere else is downgraded to context for an editor, and finding nothing remains an abstention. It does not claim universal truth detection, comprehensive legal review, or permission to publish autonomously.
 
 - Use 'legal or standards risk' rather than 'libel verdict.' The output routes risk to an editor and is not legal advice.
 

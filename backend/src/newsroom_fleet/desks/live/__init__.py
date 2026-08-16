@@ -35,17 +35,27 @@ def live_desk_set(
     implementation = "live"
 
     data_checker: object = LiveDataChecker(model)
+    source_verifier: object = LiveSourceVerifier(model)
     if settings.grounding == GROUNDING_SEARCH:
         from newsroom_fleet.desks.live.grounded_data_checker import GroundedDataChecker
+        from newsroom_fleet.desks.live.grounded_source_verifier import GroundedSourceVerifier
         from newsroom_fleet.desks.live.grounding import GroundedResearcher
 
         # The researcher screens what it finds, so it needs the same screener
         # the intake gateway uses. It is not gaining evidence access — it is
         # gaining the sanitiser that keeps fetched pages out of a desk's
-        # reasoning context.
+        # reasoning context. One researcher serves both grounded desks.
+        researcher = GroundedResearcher(model, screener=screener)
         data_checker = GroundedDataChecker(
             model,
-            researcher=GroundedResearcher(model, screener=screener),
+            researcher=researcher,
+            approved_domains=settings.authoritative_domains,
+        )
+        # A claim that cites no source is still worth checking: the Source
+        # Verifier researches it under the same approved-authority rule.
+        source_verifier = GroundedSourceVerifier(
+            model,
+            researcher=researcher,
             approved_domains=settings.authoritative_domains,
         )
         implementation = "live+search"
@@ -55,7 +65,7 @@ def live_desk_set(
         aggregator=fallback.aggregator,  # deterministic by design, see module docstring
         watcher=LiveCorrectionsWatcher(model),
         workers={
-            Desk.SOURCE_VERIFIER: LiveSourceVerifier(model),
+            Desk.SOURCE_VERIFIER: source_verifier,  # type: ignore[dict-item]
             Desk.DATA_CHECKER: data_checker,  # type: ignore[dict-item]
             Desk.STANDARDS_REVIEWER: LiveStandardsReviewer(model),
         },
