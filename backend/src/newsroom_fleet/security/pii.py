@@ -61,6 +61,7 @@ ARTIFACT:
 """
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
+_JSON_BLOCKS = re.compile(r"\{.*?\}", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -114,7 +115,11 @@ class GemmaPIIClassifier:
                     categories="\n".join(f"- {c}" for c in PII_CATEGORIES),
                     artifact=artifact,
                 ),
-                config={"temperature": 0.0, "max_output_tokens": 200},
+                # Gemma 4 (a4b) is a thinking model: it spends tokens reasoning
+                # before the answer, so a tight cap yields thought parts only
+                # and response.text comes back empty. A PII hit reasons harder
+                # than a clean pass — 1024 tokens still truncated mid-thought.
+                config={"temperature": 0.0, "max_output_tokens": 4096},
             )
         except Exception as exc:  # noqa: BLE001
             log.warning("Gemma PII classification failed (%s)", exc)
@@ -124,16 +129,19 @@ class GemmaPIIClassifier:
         return self._parse(getattr(response, "text", "") or "")
 
     def _parse(self, raw: str) -> PIIFinding:
-        match = _JSON_RE.search(raw)
-        if not match:
+        # Greedy span first (the prompt asks for one object); fall back to each
+        # brace block so reasoning preamble around the JSON cannot break parsing.
+        data: dict | None = None
+        candidates = [*_JSON_RE.findall(raw), *_JSON_BLOCKS.findall(raw)]
+        for candidate in candidates:
+            try:
+                data = json.loads(candidate)
+                break
+            except json.JSONDecodeError:
+                continue
+        if data is None:
             return PIIFinding(
                 has_pii=False, abstained=True, detail="classifier returned unparseable output"
-            )
-        try:
-            data = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return PIIFinding(
-                has_pii=False, abstained=True, detail="classifier returned malformed JSON"
             )
 
         # Out-of-vocabulary labels are dropped rather than trusted; a finding
