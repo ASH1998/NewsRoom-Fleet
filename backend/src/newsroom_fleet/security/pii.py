@@ -89,6 +89,9 @@ class GemmaPIIClassifier:
     location: str = "us-central1"
     model: str = "gemma-3-12b-it"
     api_key: str | None = None
+    # Mirrors the Gemini desks: requests are not retained by Google unless an
+    # operator opts in for debugging.
+    store: bool = False
     version: str = CLASSIFIER_VERSION
     _client: object | None = field(default=None, init=False, repr=False)
 
@@ -97,12 +100,19 @@ class GemmaPIIClassifier:
 
         from google import genai
 
+        from newsroom_fleet.desks.live._agent import client_kwargs_for
+
         api_key = self.api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if api_key:
-            self._client = genai.Client(api_key=api_key)
+            self._client = genai.Client(api_key=api_key, **client_kwargs_for(self.store))
         elif self.project:
             # Vertex path: `model` must name a deployed Model Garden endpoint.
-            self._client = genai.Client(vertexai=True, project=self.project, location=self.location)
+            self._client = genai.Client(
+                vertexai=True,
+                project=self.project,
+                location=self.location,
+                **client_kwargs_for(self.store),
+            )
         else:
             raise ValueError("Gemma needs GOOGLE_API_KEY or a GCP project")
 

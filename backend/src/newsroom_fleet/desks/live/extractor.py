@@ -133,12 +133,13 @@ def _citations(body: str, span: tuple[int, int]) -> list[str]:
 class LiveClaimExtractor:
     agent_version = "adk-extractor-1.0.0"
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, store: bool = False) -> None:
         self._agent = DeskAgent(
             name="claim_extractor",
             model=model,
             instruction=_INSTRUCTION,
             output_schema=_ExtractionResult,
+            store=store,
         )
 
     async def extract(self, article_id: str, body: str) -> ExtractionOutput:

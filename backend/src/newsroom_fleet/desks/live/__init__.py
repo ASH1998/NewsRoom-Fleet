@@ -32,10 +32,13 @@ def live_desk_set(
     settings: Settings, *, fallback: DeskSet, screener: Screener | None = None
 ) -> DeskSet:
     model = settings.gemini_model
+    # Opt out of Google's server-side request storage on every call unless the
+    # operator explicitly enabled it for debugging (NRF_GEMINI_STORE=true).
+    store = settings.gemini_store
     implementation = "live"
 
-    data_checker: object = LiveDataChecker(model)
-    source_verifier: object = LiveSourceVerifier(model)
+    data_checker: object = LiveDataChecker(model, store=store)
+    source_verifier: object = LiveSourceVerifier(model, store=store)
     if settings.grounding == GROUNDING_SEARCH:
         from newsroom_fleet.desks.live.grounded_data_checker import GroundedDataChecker
         from newsroom_fleet.desks.live.grounded_source_verifier import GroundedSourceVerifier
@@ -45,11 +48,12 @@ def live_desk_set(
         # the intake gateway uses. It is not gaining evidence access — it is
         # gaining the sanitiser that keeps fetched pages out of a desk's
         # reasoning context. One researcher serves both grounded desks.
-        researcher = GroundedResearcher(model, screener=screener)
+        researcher = GroundedResearcher(model, screener=screener, store=store)
         data_checker = GroundedDataChecker(
             model,
             researcher=researcher,
             approved_domains=settings.authoritative_domains,
+            store=store,
         )
         # A claim that cites no source is still worth checking: the Source
         # Verifier researches it under the same approved-authority rule.
@@ -57,17 +61,18 @@ def live_desk_set(
             model,
             researcher=researcher,
             approved_domains=settings.authoritative_domains,
+            store=store,
         )
         implementation = "live+search"
 
     return DeskSet(
-        extractor=LiveClaimExtractor(model),
+        extractor=LiveClaimExtractor(model, store=store),
         aggregator=fallback.aggregator,  # deterministic by design, see module docstring
-        watcher=LiveCorrectionsWatcher(model),
+        watcher=LiveCorrectionsWatcher(model, store=store),
         workers={
             Desk.SOURCE_VERIFIER: source_verifier,  # type: ignore[dict-item]
             Desk.DATA_CHECKER: data_checker,  # type: ignore[dict-item]
-            Desk.STANDARDS_REVIEWER: LiveStandardsReviewer(model),
+            Desk.STANDARDS_REVIEWER: LiveStandardsReviewer(model, store=store),
         },
         implementation=implementation,
     )

@@ -29,6 +29,19 @@ APP_NAME = "newsroom-fleet"
 T = TypeVar("T", bound=BaseModel)
 
 
+def client_kwargs_for(store: bool) -> dict[str, Any]:
+    """Client kwargs pinning request storage on every GenerateContent call.
+
+    The standard Gemini API stores requests server-side by default "to help
+    with debugging"; opting out is a top-level `store: false` body field the
+    SDK does not yet model, so it travels through `HttpOptions.extra_body`,
+    which the client merges into every request body. A newsroom's drafts and
+    sources are sensitive material, not data to be retained — but an operator
+    can flip `NRF_GEMINI_STORE=true` when debugging with Google support.
+    """
+    return {"http_options": {"extra_body": {"store": store}}}
+
+
 class DeskAgentError(RuntimeError):
     """Raised when an agent produces nothing usable. Surfaces as an ERROR verdict."""
 
@@ -49,8 +62,10 @@ class DeskAgent:
         instruction: str,
         output_schema: type[BaseModel],
         temperature: float = 0.0,
+        store: bool = False,
     ) -> None:
         from google.adk.agents import LlmAgent
+        from google.adk.models import Gemini
         from google.adk.runners import Runner
         from google.adk.sessions import InMemorySessionService
         from google.genai import types
@@ -60,7 +75,7 @@ class DeskAgent:
         self._session_service = InMemorySessionService()
         self._agent = LlmAgent(
             name=name,
-            model=model,
+            model=Gemini(model=model, client_kwargs=client_kwargs_for(store)),
             instruction=instruction,
             output_schema=output_schema,
             output_key="desk_output",

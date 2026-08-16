@@ -188,6 +188,12 @@ its cost in [`deploy/CLOUD_LEDGER.md`](deploy/CLOUD_LEDGER.md).
   a publication.
 - Degradation fails safe: a screening outage falls back to the local detector and stamps
   the result degraded; it never treats unscreened content as clean.
+- **Gemini request storage is opted out on every call.** By default, GenerateContent
+  (standard Gemini API) requests are stored server-side to help with debugging; the
+  fleet sets `store: false` per request on every live call (desks, search researcher,
+  Gemma PII pass), so a newsroom's drafts and sources are not retained by Google. To
+  enable retention for observability/debugging, run with `NRF_GEMINI_STORE=true` —
+  `GET /api/runtime` reports `gemini_store` either way.
 
 **Limitations, stated plainly**
 

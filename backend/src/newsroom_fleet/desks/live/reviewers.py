@@ -84,9 +84,10 @@ advice and you do not render a libel verdict.
 class LiveSourceVerifier:
     agent_version = "adk-source-verifier-1.0.0"
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, store: bool = False) -> None:
         self._agent = DeskAgent(
             name="source_verifier",
+            store=store,
             model=model,
             instruction=_SOURCE_INSTRUCTION,
             output_schema=DeskJudgement,
@@ -155,9 +156,10 @@ class LiveSourceVerifier:
 class LiveDataChecker:
     agent_version = "adk-data-checker-1.0.0"
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, store: bool = False) -> None:
         self._agent = DeskAgent(
             name="data_checker",
+            store=store,
             model=model,
             instruction=_DATA_INSTRUCTION,
             output_schema=DeskJudgement,
@@ -207,9 +209,10 @@ class LiveDataChecker:
 class LiveStandardsReviewer:
     agent_version = "adk-standards-reviewer-1.0.0"
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, store: bool = False) -> None:
         self._agent = DeskAgent(
             name="standards_reviewer",
+            store=store,
             model=model,
             instruction=_STANDARDS_INSTRUCTION,
             output_schema=DeskJudgement,

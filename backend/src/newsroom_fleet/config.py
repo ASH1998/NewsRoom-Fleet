@@ -115,6 +115,11 @@ class Settings:
     # five-category classifier does not need the dense 31B.
     gemma_model: str = "gemma-4-26b-a4b-it"
     model_armor_template: str | None = None  # short template id, not the full path
+    # The standard Gemini API stores GenerateContent requests server-side by
+    # default "to help with debugging". The fleet opts out on every call
+    # (`store: false`); set true (NRF_GEMINI_STORE=true) to let Google retain
+    # requests when debugging with Google support.
+    gemini_store: bool = False
     firestore_database: str = "(default)"
     firestore_prefix: str = "newsroom_fleet"
     pubsub_topic: str = "newsroom-fleet-reviews"
@@ -157,6 +162,7 @@ class Settings:
             "tracing": self.tracing,
             "pii_classifier": self.pii_classifier,
             "grounding": self.grounding,
+            "gemini_store": self.gemini_store,
             "gcp_project": self.gcp_project,
             "gcp_location": self.gcp_location,
             "models": {
@@ -219,6 +225,7 @@ class Settings:
             gemini_model=_first("NRF_GEMINI_MODEL", "GOOGLE_MODEL", default="gemini-3.6-flash"),
             gemma_model=_first("NRF_GEMMA_MODEL", default="gemma-4-26b-a4b-it"),
             model_armor_template=os.getenv("NRF_MODEL_ARMOR_TEMPLATE") or None,
+            gemini_store=os.getenv("NRF_GEMINI_STORE", "").strip().lower() in ("1", "true", "yes"),
             firestore_database=os.getenv("NRF_FIRESTORE_DATABASE", "(default)"),
             firestore_prefix=os.getenv("NRF_FIRESTORE_PREFIX", "newsroom_fleet"),
             pubsub_topic=os.getenv("NRF_PUBSUB_TOPIC", "newsroom-fleet-reviews"),

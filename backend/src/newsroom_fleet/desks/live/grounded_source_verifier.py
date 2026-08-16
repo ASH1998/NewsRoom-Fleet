@@ -80,16 +80,18 @@ class GroundedSourceVerifier:
         *,
         researcher: GroundedResearcher,
         approved_domains: tuple[str, ...] = (),
+        store: bool = False,
     ) -> None:
         self._researcher = researcher
         self._approved = approved_domains
         # The attached-source paths are unchanged from the non-grounded desk.
-        self._source_desk = LiveSourceVerifier(model)
+        self._source_desk = LiveSourceVerifier(model, store=store)
         self._agent = DeskAgent(
             name="source_verifier_grounded",
             model=model,
             instruction=_INSTRUCTION,
             output_schema=DeskJudgement,
+            store=store,
         )
 
     async def review(self, view: SourceEvidenceView) -> Verdict:  # type: ignore[override]

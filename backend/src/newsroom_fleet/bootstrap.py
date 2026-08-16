@@ -87,6 +87,7 @@ def _build_screener(settings: Settings, resolved: dict[str, str]) -> Screener:
                     project=settings.gcp_project,
                     location=settings.gcp_location,
                     model=settings.gemma_model,
+                    store=settings.gemini_store,
                 ),
             )
             resolved["pii_classifier"] = PII_GEMMA

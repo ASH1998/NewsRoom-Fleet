@@ -79,16 +79,18 @@ class GroundedDataChecker:
         *,
         researcher: GroundedResearcher,
         approved_domains: tuple[str, ...] = (),
+        store: bool = False,
     ) -> None:
         self._researcher = researcher
         self._approved = approved_domains
         # The adapter path is unchanged from the non-grounded live desk.
-        self._adapter_desk = LiveDataChecker(model)
+        self._adapter_desk = LiveDataChecker(model, store=store)
         self._agent = DeskAgent(
             name="data_checker_grounded",
             model=model,
             instruction=_INSTRUCTION,
             output_schema=DeskJudgement,
+            store=store,
         )
 
     async def review(self, view: DataEvidenceView) -> Verdict:  # type: ignore[override]

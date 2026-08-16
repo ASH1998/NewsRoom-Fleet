@@ -33,6 +33,7 @@ from datetime import UTC, datetime
 from urllib.parse import urlparse
 from uuid import uuid4
 
+from newsroom_fleet.desks.live._agent import client_kwargs_for
 from newsroom_fleet.domain.contracts import SecurityDisposition
 from newsroom_fleet.security.screening import Screener
 
@@ -143,8 +144,11 @@ class GroundedResearcher:
 
     agent_version = RESEARCHER_VERSION
 
-    def __init__(self, model: str, *, screener: Screener | None = None) -> None:
+    def __init__(
+        self, model: str, *, screener: Screener | None = None, store: bool = False
+    ) -> None:
         from google.adk.agents import LlmAgent
+        from google.adk.models import Gemini
         from google.adk.runners import Runner
         from google.adk.sessions import InMemorySessionService
         from google.adk.tools import google_search
@@ -155,7 +159,7 @@ class GroundedResearcher:
         self._screener = screener
         self._agent = LlmAgent(
             name="research_desk",
-            model=model,
+            model=Gemini(model=model, client_kwargs=client_kwargs_for(store)),
             instruction=_INSTRUCTION,
             tools=[google_search],
             generate_content_config=types.GenerateContentConfig(temperature=0.0),

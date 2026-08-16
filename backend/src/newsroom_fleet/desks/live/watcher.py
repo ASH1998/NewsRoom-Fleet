@@ -48,7 +48,7 @@ class _CorrectionDraft(BaseModel):
 class LiveCorrectionsWatcher:
     agent_version = "adk-corrections-watcher-1.0.0"
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, *, store: bool = False) -> None:
         self._deterministic = FixtureCorrectionsWatcher()
         self._agent = DeskAgent(
             name="corrections_watcher",
@@ -56,6 +56,7 @@ class LiveCorrectionsWatcher:
             instruction=_INSTRUCTION,
             output_schema=_CorrectionDraft,
             temperature=0.2,
+            store=store,
         )
 
     def check(
