@@ -64,11 +64,11 @@ export function SubmitDialog({
         <header className="flex items-baseline justify-between border-b border-stone-800 px-5 py-3">
           <div>
             <h2 className="text-xs font-semibold tracking-[0.14em] text-stone-200 uppercase">
-              Submit a draft
+              Submit your own article
             </h2>
             <p className="mt-0.5 text-[11px] text-stone-500">
-              Screened at intake, decomposed into claims, and routed to the desks — same pipeline
-              as the golden article.
+              Write a story below. It is screened at intake, decomposed into claims, and routed to
+              the same verification desks as the golden article.
             </p>
           </div>
           <Button variant="ghost" onClick={onClose}>

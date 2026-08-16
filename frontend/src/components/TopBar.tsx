@@ -71,6 +71,14 @@ export function TopBar({
               : "Fixture mode: zero API keys, zero network, zero cloud"
           }
         >
+          {runtime.requested.models?.reasoning && (
+            <Badge
+              tone="info"
+              title="The Google AI model every live desk agent runs on (ADK)"
+            >
+              agents:{runtime.requested.models.reasoning}
+            </Badge>
+          )}
           {cloudComponents.length === 0 ? (
             <Badge tone="neutral">local · no cloud</Badge>
           ) : (
@@ -106,9 +114,9 @@ export function TopBar({
           variant="primary"
           onClick={onSubmitOwn}
           disabled={busy}
-          title="Submit a fresh article through the same pipeline"
+          title="Write and submit your own article through the same verification pipeline"
         >
-          Submit a draft
+          Submit your own article
         </Button>
 
         <div className="flex items-center gap-1.5">
