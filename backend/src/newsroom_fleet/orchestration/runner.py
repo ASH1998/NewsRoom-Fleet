@@ -39,7 +39,9 @@ class DeskRunner:
     ) -> Verdict:
         # Duplicate delivery protection: a persisted healthy verdict is returned
         # as-is; only a persisted ERROR verdict may be superseded by a new run.
-        existing = self._repo.get_verdict(claim.claim_id, desk)
+        # Scoped by article — claim ids repeat across articles, and one
+        # article's verdict must never suppress another's review.
+        existing = self._repo.get_verdict(claim.article_id, claim.claim_id, desk)
         if existing is not None and existing.result is not VerdictResult.ERROR:
             return existing
 
@@ -78,7 +80,9 @@ class DeskRunner:
                                 "result": verdict.result.value,
                                 "attempt": attempt,
                                 "agent_version": verdict.agent_version,
-                                "idempotency_key": f"{claim.claim_id}:{desk.value}",
+                                "idempotency_key": (
+                                    f"{claim.article_id}:{claim.claim_id}:{desk.value}"
+                                ),
                             },
                         )
                     )

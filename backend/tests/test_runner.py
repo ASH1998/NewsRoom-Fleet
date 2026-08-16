@@ -117,6 +117,7 @@ async def test_error_verdict_can_be_replaced_by_healthy_run(repo):
     )
     assert recovered.result is VerdictResult.VERIFIED
     assert (
-        repo.get_verdict(claim.claim_id, Desk.STANDARDS_REVIEWER).result is VerdictResult.VERIFIED
+        repo.get_verdict(claim.article_id, claim.claim_id, Desk.STANDARDS_REVIEWER).result
+        is VerdictResult.VERIFIED
     )
     assert len(repo.get_article_verdicts(claim.article_id)) == 1  # single persisted result per key

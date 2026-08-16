@@ -1,11 +1,12 @@
 """Review task queue — the seam between in-process asyncio and Pub/Sub.
 
 A review task is the unit of independent work: one claim, one desk. Its
-idempotency key is `{claim_id}:{desk}` — the same key the repository already
-enforces one persisted verdict against — so duplicate delivery (Pub/Sub's
-at-least-once guarantee) cannot produce a duplicate verdict. The queue moves
-where the work runs; it does not change what a desk may see or what the gate
-reads.
+idempotency key is `{article_id}:{claim_id}:{desk}` — claim ids are unique per
+article, not globally, so the article scopes the key — and it is the same key
+the repository already enforces one persisted verdict against, so duplicate
+delivery (Pub/Sub's at-least-once guarantee) cannot produce a duplicate
+verdict. The queue moves where the work runs; it does not change what a desk
+may see or what the gate reads.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ class ReviewTask:
 
     @property
     def idempotency_key(self) -> str:
-        return f"{self.claim_id}:{self.desk.value}"
+        return f"{self.article_id}:{self.claim_id}:{self.desk.value}"
 
     def to_dict(self) -> dict[str, str]:
         return {

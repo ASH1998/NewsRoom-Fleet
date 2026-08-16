@@ -173,3 +173,32 @@ async def test_reporter_cannot_record_editorial_decision(service):
             revised_text=None,
             resolved_verdict_ids=[],
         )
+
+
+async def test_articles_with_repeated_claim_ids_do_not_share_verdict_slots(service):
+    """Claim ids (`clm_01`…) are unique per article, not globally.
+
+    A second article minting the same claim ids must have every desk actually
+    run — the first article's persisted verdicts can neither suppress its
+    reviews nor be overwritten by its aggregates. (Found live: a user-submitted
+    article silently lost two desk reviews to the golden article's verdicts.)
+    """
+    first = load_golden_article()
+    await service.submit_article(first, actor="reporter:j.reyes")
+    before = service.article_view(first.article_id)["verdicts"]
+    assert len(before) == 11  # golden baseline: 6 worker + 5 aggregate
+
+    second = load_golden_article().model_copy(update={"article_id": "art_second_riverbend"})
+    await service.submit_article(second, actor="reporter:s.mitra")
+    after_first = service.article_view(first.article_id)["verdicts"]
+    second_view = service.article_view("art_second_riverbend")["verdicts"]
+
+    # Every desk ran for the second article: same fan-out as the golden run.
+    assert len(second_view) == 11
+    for verdict in second_view:
+        assert verdict["article_id"] == "art_second_riverbend"
+    workers = {v["claim_id"] for v in second_view if v["desk"] != "verdict_aggregator"}
+    assert workers == {f"clm_0{i}" for i in range(1, 6)}
+
+    # The first article's persisted verdicts are untouched by the second run.
+    assert after_first == before
