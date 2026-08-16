@@ -82,6 +82,7 @@ fresh article with ADK agents on Gemini by flipping one variable.
 | PII pass | off | Gemma 3 | `NRF_PII=gemma` |
 | `MemoryStore` | JSON file | Vertex AI Memory Bank | `NRF_MEMORY=memory_bank` |
 | Tracing | off | Cloud Trace | `NRF_TRACING=cloud` |
+| Claim pacing | one claim at a time | N concurrent claims | `NRF_REVIEW_CONCURRENCY=N` |
 
 `NRF_PRESET=cloud` sets all of them at once. `GET /api/runtime` reports what was
 *actually* constructed, so a component that fell back to its local implementation

@@ -121,3 +121,55 @@ async def test_error_verdict_can_be_replaced_by_healthy_run(repo):
         is VerdictResult.VERIFIED
     )
     assert len(repo.get_article_verdicts(claim.article_id)) == 1  # single persisted result per key
+
+
+async def test_review_all_paces_claims_one_at_a_time_by_default(repo):
+    """Bounded claim concurrency: no overlap at the default of one, overlap
+    allowed when the limit is raised. A live fleet that fires every claim at
+    once saturates the event loop and trips API rate limits — found live on a
+    12-claim user submission."""
+    from newsroom_fleet.adapters.authoritative import load_fixture_adapter
+    from newsroom_fleet.config import FIXTURES_DIR
+    from newsroom_fleet.desks.factory import fixture_desk_set
+    from newsroom_fleet.fixtures.loader import load_golden_article
+    from newsroom_fleet.memory.store import load_memory
+    from newsroom_fleet.orchestration.router import PolicyRouter, RoutingContext
+
+    active = 0
+    peak = 0
+
+    class PacingDesk:
+        agent_version = "pacing-1"
+
+        async def review(self, view):
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.05)
+            active -= 1
+            return healthy_verdict(view.claim)
+
+    article = load_golden_article()
+    ctx = RoutingContext(
+        article=article,
+        security_results=[],
+        adapter=load_fixture_adapter(FIXTURES_DIR / "authoritative_data.json", "v1"),
+        memory=load_memory(FIXTURES_DIR / "house_rules.json"),
+    )
+    desks = fixture_desk_set()
+    desks.workers[Desk.STANDARDS_REVIEWER] = PacingDesk()
+
+    sequential = PolicyRouter(repo, DeskRunner(repo, RunnerConfig()), desks)
+    claims = [
+        make_claim().model_copy(update={"claim_id": "clm_01"}),
+        make_claim().model_copy(update={"claim_id": "clm_02"}),
+    ]
+    verdicts = await sequential.review_all(claims, ctx)
+    assert peak == 1  # one claim at a time
+    assert len(verdicts) == 4  # worker + aggregate per claim
+
+    peak = 0
+    parallel = PolicyRouter(repo, DeskRunner(repo, RunnerConfig()), desks, max_concurrent_claims=2)
+    wider = [c.model_copy(update={"claim_id": c.claim_id + "b"}) for c in claims]
+    await parallel.review_all(wider, ctx)
+    assert peak == 2  # the knob opens the gate when throughput matters

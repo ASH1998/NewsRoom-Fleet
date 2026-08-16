@@ -94,6 +94,11 @@ class Settings:
     db_path: Path = _DEFAULT_DB_PATH
     desk_timeout_s: float = 5.0
     desk_max_attempts: int = 2
+    # Claims reviewed at once. 1 = one claim at a time: a live fleet paces its
+    # Gemini/search calls (no rate-limit storms, no event-loop saturation), and
+    # the editor UI streams the fleet working down the list — which is also the
+    # better demo. Raise it for throughput; fixture desks are instant either way.
+    review_concurrency: int = 1
     # Demo hook: name of a desk whose worker crashes on every attempt (graceful
     # degradation proof). None in normal operation.
     fail_desk: str | None = None
@@ -204,6 +209,7 @@ class Settings:
             db_path=Path(os.getenv("NRF_DB_PATH", str(_DEFAULT_DB_PATH))),
             desk_timeout_s=float(os.getenv("NRF_DESK_TIMEOUT_S", default_timeout)),
             desk_max_attempts=int(os.getenv("NRF_DESK_MAX_ATTEMPTS", "2")),
+            review_concurrency=int(os.getenv("NRF_REVIEW_CONCURRENCY", "1")),
             fail_desk=os.getenv("NRF_FAIL_DESK") or None,
             authoritative_dataset=os.getenv("NRF_AUTHORITATIVE_DATASET", "v1"),
             gcp_project=project,
