@@ -38,7 +38,9 @@ def fixture_desk_set() -> DeskSet:
     )
 
 
-def build_desk_set(settings: Settings) -> DeskSet:
+def build_desk_set(settings: Settings, *, screener: object | None = None) -> DeskSet:
+    """Assemble the fleet. `screener` is passed to desks that fetch their own
+    evidence, so anything they pull in is screened before it reaches a prompt."""
     if settings.mode != MODE_LIVE:
         return fixture_desk_set()
 
@@ -49,7 +51,7 @@ def build_desk_set(settings: Settings) -> DeskSet:
         log.warning("live mode requested but the ADK stack is missing (%s); using fixtures", exc)
         return fallback
     try:
-        return live_desk_set(settings, fallback=fallback)
+        return live_desk_set(settings, fallback=fallback, screener=screener)  # type: ignore[arg-type]
     except Exception as exc:  # noqa: BLE001 — a bad live config must never break intake
         log.warning("live desk construction failed (%s); using fixtures", exc)
         return fallback

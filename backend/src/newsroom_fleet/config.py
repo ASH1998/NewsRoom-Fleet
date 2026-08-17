@@ -65,6 +65,7 @@ QUEUE_INPROCESS, QUEUE_PUBSUB = "inprocess", "pubsub"
 MEMORY_FILE, MEMORY_BANK = "file", "memory_bank"
 TRACING_OFF, TRACING_CONSOLE, TRACING_CLOUD = "off", "console", "cloud"
 PII_OFF, PII_GEMMA = "off", "gemma"
+GROUNDING_OFF, GROUNDING_SEARCH = "off", "search"
 
 
 def _env_flag(name: str, default: str) -> str:
@@ -81,11 +82,23 @@ class Settings:
     memory_backend: str = MEMORY_FILE
     tracing: str = TRACING_OFF
     pii_classifier: str = PII_OFF  # bounded Gemma bonus task at intake
+    # Google Search grounding for the Data Checker. Only meaningful in live
+    # mode, and billed per grounded query, so it is its own switch rather than
+    # something `mode=live` silently turns on.
+    grounding: str = GROUNDING_OFF
+    #: Extra domains this newsroom will let clear a claim, beyond
+    #: domain/authority.py's defaults.
+    authoritative_domains: tuple[str, ...] = ()
 
     # --- local runtime -----------------------------------------------------
     db_path: Path = _DEFAULT_DB_PATH
     desk_timeout_s: float = 5.0
     desk_max_attempts: int = 2
+    # Claims reviewed at once. 1 = one claim at a time: a live fleet paces its
+    # Gemini/search calls (no rate-limit storms, no event-loop saturation), and
+    # the editor UI streams the fleet working down the list — which is also the
+    # better demo. Raise it for throughput; fixture desks are instant either way.
+    review_concurrency: int = 1
     # Demo hook: name of a desk whose worker crashes on every attempt (graceful
     # degradation proof). None in normal operation.
     fail_desk: str | None = None
@@ -96,12 +109,17 @@ class Settings:
     # Matches the existing Firestore database's region (asia-south1). Keeping
     # compute next to state avoids a cross-region hop on every read.
     gcp_location: str = "asia-south1"
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-3.7-flash"
     # Gemma is the bonus model and does one bounded job (intake PII). The A4B
     # mixture-of-experts variant is the cheap end of the family — a
     # five-category classifier does not need the dense 31B.
     gemma_model: str = "gemma-4-26b-a4b-it"
     model_armor_template: str | None = None  # short template id, not the full path
+    # The standard Gemini API stores GenerateContent requests server-side by
+    # default "to help with debugging". The fleet opts out on every call
+    # (`store: false`); set true (NRF_GEMINI_STORE=true) to let Google retain
+    # requests when debugging with Google support.
+    gemini_store: bool = False
     firestore_database: str = "(default)"
     firestore_prefix: str = "newsroom_fleet"
     pubsub_topic: str = "newsroom-fleet-reviews"
@@ -143,6 +161,8 @@ class Settings:
             "memory": self.memory_backend,
             "tracing": self.tracing,
             "pii_classifier": self.pii_classifier,
+            "grounding": self.grounding,
+            "gemini_store": self.gemini_store,
             "gcp_project": self.gcp_project,
             "gcp_location": self.gcp_location,
             "models": {
@@ -181,18 +201,31 @@ class Settings:
             memory_backend=_env_flag("NRF_MEMORY", MEMORY_BANK if cloud else MEMORY_FILE),
             tracing=_env_flag("NRF_TRACING", TRACING_CLOUD if cloud else TRACING_OFF),
             pii_classifier=_env_flag("NRF_PII", PII_GEMMA if cloud else PII_OFF),
+            # Defaults on in live mode: a fleet that cannot look anything up is
+            # the thing this switch exists to fix. Set NRF_GROUNDING=off to
+            # review without spending grounded queries.
+            grounding=_env_flag(
+                "NRF_GROUNDING", GROUNDING_SEARCH if mode == MODE_LIVE else GROUNDING_OFF
+            ),
+            authoritative_domains=tuple(
+                d.strip()
+                for d in (os.getenv("NRF_AUTHORITATIVE_DOMAINS") or "").split(",")
+                if d.strip()
+            ),
             db_path=Path(os.getenv("NRF_DB_PATH", str(_DEFAULT_DB_PATH))),
             desk_timeout_s=float(os.getenv("NRF_DESK_TIMEOUT_S", default_timeout)),
             desk_max_attempts=int(os.getenv("NRF_DESK_MAX_ATTEMPTS", "2")),
+            review_concurrency=int(os.getenv("NRF_REVIEW_CONCURRENCY", "1")),
             fail_desk=os.getenv("NRF_FAIL_DESK") or None,
             authoritative_dataset=os.getenv("NRF_AUTHORITATIVE_DATASET", "v1"),
             gcp_project=project,
             gcp_location=_first("NRF_GCP_LOCATION", default="asia-south1"),
             # GOOGLE_MODEL is this project's own .env convention for the
             # reasoning model; NRF_GEMINI_MODEL overrides it in a deployment.
-            gemini_model=_first("NRF_GEMINI_MODEL", "GOOGLE_MODEL", default="gemini-3.6-flash"),
+            gemini_model=_first("NRF_GEMINI_MODEL", "GOOGLE_MODEL", default="gemini-3.7-flash"),
             gemma_model=_first("NRF_GEMMA_MODEL", default="gemma-4-26b-a4b-it"),
             model_armor_template=os.getenv("NRF_MODEL_ARMOR_TEMPLATE") or None,
+            gemini_store=os.getenv("NRF_GEMINI_STORE", "").strip().lower() in ("1", "true", "yes"),
             firestore_database=os.getenv("NRF_FIRESTORE_DATABASE", "(default)"),
             firestore_prefix=os.getenv("NRF_FIRESTORE_PREFIX", "newsroom_fleet"),
             pubsub_topic=os.getenv("NRF_PUBSUB_TOPIC", "newsroom-fleet-reviews"),

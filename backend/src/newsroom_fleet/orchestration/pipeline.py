@@ -88,7 +88,9 @@ class FleetService:
                 fail_desk=Desk(settings.fail_desk) if settings.fail_desk else None,
             ),
         )
-        self.router = PolicyRouter(repo, self.runner, self.desks)
+        self.router = PolicyRouter(
+            repo, self.runner, self.desks, max_concurrent_claims=settings.review_concurrency
+        )
 
     # ------------------------------------------------------------ plumbing
     def attach_queue(self, queue: ReviewQueue) -> None:

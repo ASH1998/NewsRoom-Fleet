@@ -139,7 +139,9 @@ class FirestoreRepository:
         """
         from google.cloud import firestore
 
-        ref = self._col("verdicts").document(f"{verdict_.claim_id}__{verdict_.desk.value}")
+        ref = self._col("verdicts").document(
+            f"{verdict_.article_id}__{verdict_.claim_id}__{verdict_.desk.value}"
+        )
         payload = {
             "article_id": verdict_.article_id,
             "claim_id": verdict_.claim_id,
@@ -162,9 +164,9 @@ class FirestoreRepository:
 
         return _write(self._transaction_factory())
 
-    def get_verdict(self, claim_id: str, desk: str) -> Verdict | None:
+    def get_verdict(self, article_id: str, claim_id: str, desk: str) -> Verdict | None:
         desk_value = desk.value if isinstance(desk, Desk) else str(desk)
-        doc = self._col("verdicts").document(f"{claim_id}__{desk_value}").get()
+        doc = self._col("verdicts").document(f"{article_id}__{claim_id}__{desk_value}").get()
         return Verdict.model_validate_json(doc.to_dict()["json"]) if doc.exists else None
 
     def get_article_verdicts(self, article_id: str) -> list[Verdict]:

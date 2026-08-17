@@ -2,7 +2,9 @@
 
 Routing uses the Masthead registrations to build each desk's bounded view. The
 Source Verifier never sees the Data Checker's answer; quarantined sources reach
-no reviewer — only screening metadata does. Desks run concurrently and fail
+no reviewer — only screening metadata does. Claims are reviewed with bounded
+concurrency (one at a time by default, so a live fleet paces its API calls and
+the stream is legible); the desks within a claim run concurrently and fail
 independently.
 """
 
@@ -48,12 +50,20 @@ class RoutingContext:
 
 
 class PolicyRouter:
-    def __init__(self, repo: Repository, runner: DeskRunner, desks: DeskSet) -> None:
+    def __init__(
+        self,
+        repo: Repository,
+        runner: DeskRunner,
+        desks: DeskSet,
+        *,
+        max_concurrent_claims: int = 1,
+    ) -> None:
         self._repo = repo
         self._runner = runner
         self._desks = desks.workers
         self._aggregator = desks.aggregator
         self._queue: ReviewQueue | None = None
+        self._max_claims = max(1, max_concurrent_claims)
 
     def attach_queue(self, queue: ReviewQueue) -> None:
         """Route review work through a broker instead of the local event loop."""
@@ -236,7 +246,16 @@ class PolicyRouter:
             **{
                 "newsroom.article_id": ctx.article.article_id,
                 "newsroom.claim_count": len(claims),
+                "newsroom.max_concurrent_claims": self._max_claims,
             },
         ):
-            nested = await asyncio.gather(*(self.review_claim(c, ctx) for c in claims))
+            # Bounded, not all-at-once: a semaphore per call keeps live API
+            # pressure predictable and makes the review stream followable.
+            gate = asyncio.Semaphore(self._max_claims)
+
+            async def bounded(claim: Claim) -> list[Verdict]:
+                async with gate:
+                    return await self.review_claim(claim, ctx)
+
+            nested = await asyncio.gather(*(bounded(c) for c in claims))
         return [v for vs in nested for v in vs]

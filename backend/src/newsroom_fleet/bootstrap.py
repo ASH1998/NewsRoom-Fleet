@@ -87,6 +87,7 @@ def _build_screener(settings: Settings, resolved: dict[str, str]) -> Screener:
                     project=settings.gcp_project,
                     location=settings.gcp_location,
                     model=settings.gemma_model,
+                    store=settings.gemini_store,
                 ),
             )
             resolved["pii_classifier"] = PII_GEMMA
@@ -121,8 +122,9 @@ def build_fleet(settings: Settings | None = None) -> Fleet:
     repo = _build_repository(settings, resolved)
     screener = _build_screener(settings, resolved)
     memory = _build_memory(settings, resolved)
-    desks = build_desk_set(settings)
+    desks = build_desk_set(settings, screener=screener)
     resolved["mode"] = desks.implementation
+    resolved["grounding"] = "search" if desks.implementation.endswith("+search") else "off"
 
     service = FleetService(settings, repo, screener, memory=memory, desks=desks)
 

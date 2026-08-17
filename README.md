@@ -47,22 +47,7 @@ report — the number that matters is **unsafe false verifications: 0**.
 
 ## Architecture
 
-```
-submit ──▶ Gateway + screening ──▶ Claim Extractor ──▶ Policy router
-              │ quarantine              │ atomic claims      │ minimum evidence per desk
-              ▼                         ▼                    ▼
-        SecurityResult            Claim records      Source Verifier │ Data Checker │ Standards Reviewer
-                                                            │ signed structured verdicts
-                                                            ▼
-                                              Verdict Aggregator (verdict matrix)
-                                                            ▼
-                                              Editor Gate (deterministic policy)
-                                                            ▼
-                                     editor decision → PUBLISHED → Corrections Watcher
-
-        across all stages: persistence (SQLite / Firestore), memory (approved
-        standards + precedents), append-only audit trail, OpenTelemetry spans
-```
+![arch](assets/newsroom-fleet-architecture-hackathon-v2.png)
 
 Enterprise pillars map to newsroom terms: agent registry → **Masthead**, policy
 enforcement → **Editor Gate**, persistent memory → **Corrections Ledger**,
@@ -70,18 +55,21 @@ observability → **Article Audit Trail**.
 
 Every cloud-bound capability sits behind an interface with a local implementation,
 and each is an **independent switch**. The recorded demo runs deterministic desks on
-real Firestore, Pub/Sub, Model Armor, and Cloud Trace; the same deployment reviews a
-fresh article with ADK agents on Gemini by flipping one variable.
+real Firestore, Pub/Sub, and Cloud Trace; the same deployment reviews a fresh article
+with ADK agents on Gemini by flipping one variable. Model Armor screening
+(`NRF_SCREENER=model_armor`, needs the opt-in Tier C provisioning) and the Gemma PII
+pass (`NRF_PII=gemma`) are switches on the same deployment.
 
 | Interface | Local (default) | Google Cloud | Switch |
 | --- | --- | --- | --- |
-| Desks | fixture (deterministic) | ADK + Gemini 2.5 Flash | `NRF_MODE=live` |
+| Desks | fixture (deterministic) | ADK + Gemini 3.7 Flash | `NRF_MODE=live` |
 | `Repository` | SQLite | Firestore | `NRF_REPOSITORY=firestore` |
 | `ReviewQueue` | asyncio | Pub/Sub + push worker | `NRF_QUEUE=pubsub` |
 | `Screener` | heuristic detector | Model Armor | `NRF_SCREENER=model_armor` |
-| PII pass | off | Gemma 3 | `NRF_PII=gemma` |
+| PII pass | off | Gemma 4 | `NRF_PII=gemma` |
 | `MemoryStore` | JSON file | Vertex AI Memory Bank | `NRF_MEMORY=memory_bank` |
 | Tracing | off | Cloud Trace | `NRF_TRACING=cloud` |
+| Claim pacing | one claim at a time | N concurrent claims | `NRF_REVIEW_CONCURRENCY=N` |
 
 `NRF_PRESET=cloud` sets all of them at once. `GET /api/runtime` reports what was
 *actually* constructed, so a component that fell back to its local implementation
@@ -187,6 +175,12 @@ its cost in [`deploy/CLOUD_LEDGER.md`](deploy/CLOUD_LEDGER.md).
   a publication.
 - Degradation fails safe: a screening outage falls back to the local detector and stamps
   the result degraded; it never treats unscreened content as clean.
+- **Gemini request storage is opted out on every call.** By default, GenerateContent
+  (standard Gemini API) requests are stored server-side to help with debugging; the
+  fleet sets `store: false` per request on every live call (desks, search researcher,
+  Gemma PII pass), so a newsroom's drafts and sources are not retained by Google. To
+  enable retention for observability/debugging, run with `NRF_GEMINI_STORE=true` —
+  `GET /api/runtime` reports `gemini_store` either way.
 
 **Limitations, stated plainly**
 

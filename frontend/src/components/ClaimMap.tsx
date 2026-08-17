@@ -1,14 +1,29 @@
 import type { ArticleView, Claim, ClaimAssessment, Verdict } from "../types";
 import { Badge, Empty, Panel, deskLabel, verdictTone } from "./ui";
 
-function VerdictCard({ verdict }: { verdict: Verdict }) {
+function VerdictCard({
+  verdict,
+  resolvedByEditor,
+}: {
+  verdict: Verdict;
+  resolvedByEditor: boolean;
+}) {
   return (
-    <li className="rounded border border-stone-800 bg-stone-950/50 px-2.5 py-2">
+    <li
+      className={`rounded border px-2.5 py-2 ${
+        resolvedByEditor
+          ? "border-emerald-900/70 bg-emerald-950/25"
+          : "border-stone-800 bg-stone-950/50"
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium text-stone-300">{deskLabel(verdict.desk)}</span>
         <div className="flex items-center gap-1">
-          {verdict.needs_human && <Badge tone="warn">needs human</Badge>}
-          <Badge tone={verdictTone(verdict.result)}>{verdict.result}</Badge>
+          {verdict.needs_human && !resolvedByEditor && <Badge tone="warn">needs human</Badge>}
+          <Badge tone={resolvedByEditor ? "good" : verdictTone(verdict.result)}>
+            {verdict.result}
+          </Badge>
+          {resolvedByEditor && <Badge tone="good">resolved by editor</Badge>}
         </div>
       </div>
 
@@ -55,12 +70,14 @@ function ClaimCard({
   claim,
   verdicts,
   assessment,
+  decidedIds,
   selected,
   onSelect,
 }: {
   claim: Claim;
   verdicts: Verdict[];
   assessment: ClaimAssessment | undefined;
+  decidedIds: Set<string>;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -99,7 +116,11 @@ function ClaimCard({
 
       <ul className="mt-2 space-y-1.5">
         {deskVerdicts.map((verdict) => (
-          <VerdictCard key={verdict.verdict_id} verdict={verdict} />
+          <VerdictCard
+            key={verdict.verdict_id}
+            verdict={verdict}
+            resolvedByEditor={decidedIds.has(verdict.verdict_id)}
+          />
         ))}
       </ul>
 
@@ -133,6 +154,9 @@ export function ClaimMap({
     byClaim.set(verdict.claim_id, [...(byClaim.get(verdict.claim_id) ?? []), verdict]);
   }
   const assessments = new Map(view.gate.assessments.map((a) => [a.claim_id, a]));
+  // Verdicts resolved by a recorded editorial decision — display-only; the
+  // verdict records themselves are never rewritten.
+  const decidedIds = new Set(view.decisions.flatMap((d) => d.resolved_verdict_ids));
 
   return (
     <Panel
@@ -148,6 +172,7 @@ export function ClaimMap({
             claim={claim}
             verdicts={byClaim.get(claim.claim_id) ?? []}
             assessment={assessments.get(claim.claim_id)}
+            decidedIds={decidedIds}
             selected={selectedClaim === claim.claim_id}
             onSelect={() => onSelectClaim(selectedClaim === claim.claim_id ? null : claim.claim_id)}
           />

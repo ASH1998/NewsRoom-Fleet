@@ -24,6 +24,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from newsroom_fleet.desks._common import new_verdict
+from newsroom_fleet.domain.authority import is_approved
 from newsroom_fleet.domain.contracts import (
     Claim,
     Desk,
@@ -140,4 +141,44 @@ def to_verdict(
         flags=flags,
         reason=judgement.reason,
         evidence=evidence,
+    )
+
+
+def apply_authority_rule(
+    verdict: Verdict,
+    *,
+    locator_domains: dict[str, str],
+    extra_approved: tuple[str, ...] = (),
+) -> Verdict:
+    """Only an approved authority may clear a claim; anything may raise one.
+
+    Applied to web-grounded verdicts after `to_verdict`. A `VERIFIED` resting on
+    an unapproved domain is downgraded to `UNSUPPORTED` — the evidence is kept
+    and shown to the editor, because "a source we do not vouch for agrees with
+    this" is genuinely useful context. It just is not verification.
+
+    Non-verified results pass through untouched: an unapproved source that
+    *contradicts* the article is still worth an editor's attention.
+    """
+    if verdict.result is not VerdictResult.VERIFIED:
+        return verdict
+
+    cited = [ref.locator for ref in verdict.evidence]
+    domains = [locator_domains.get(locator, "") for locator in cited]
+    if any(is_approved(domain, extra_approved) for domain in domains):
+        return verdict
+
+    shown = ", ".join(d for d in domains if d) or "an unidentified source"
+    return verdict.model_copy(
+        update={
+            "result": VerdictResult.UNSUPPORTED,
+            "needs_human": True,
+            "confidence": min(verdict.confidence, 0.6),
+            "flags": [*verdict.flags, "unapproved_source"],
+            "reason": (
+                f"corroborated only by {shown}, which is not on the newsroom's approved "
+                f"authority list — an editor must confirm the source before this can "
+                f"clear. Finding was: {verdict.reason}"
+            ),
+        }
     )

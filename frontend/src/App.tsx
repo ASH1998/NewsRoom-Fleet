@@ -46,6 +46,34 @@ export default function App() {
     setEvents(audit.events.slice().reverse());
   }, []);
 
+  /** Live desks take tens of seconds per verdict, so a submit POST is slow.
+   * While it is in flight, poll so the newsroom streams in instead of freezing
+   * and dumping everything at the end: the article lands at intake, claims
+   * appear after extraction, verdicts arrive desk by desk. The POST response
+   * stays authoritative for the final state. `resolveTarget` finds the article
+   * to watch (unknown up front for a fresh submit). */
+  const streamWhileInProgress = useCallback(
+    async (action: () => Promise<ArticleView>, resolveTarget: () => Promise<string | null>) => {
+      let watching: string | null = null;
+      const timer = window.setInterval(() => {
+        void (async () => {
+          try {
+            watching ??= await resolveTarget();
+            if (watching) await refresh(watching);
+          } catch {
+            /* reads can race a mid-write repository; the POST response wins */
+          }
+        })();
+      }, 1500);
+      try {
+        return await action();
+      } finally {
+        window.clearInterval(timer);
+      }
+    },
+    [refresh],
+  );
+
   /** Every mutation funnels through here so server-side denials surface as
    * denials (the product), and everything else surfaces as an error. */
   const run = useCallback(
@@ -84,7 +112,17 @@ export default function App() {
         setDeskImpl(registry.implementation);
         setRuntime(env);
         const latest = list.articles.at(-1);
-        if (latest) await refresh(latest.article_id);
+        if (latest) {
+          await refresh(latest.article_id);
+        } else {
+          // The desk always opens on the golden article; nobody meets an empty
+          // newsroom. In live mode this runs the real fleet once — streamed in.
+          const next = await streamWhileInProgress(
+            () => api.loadGolden(),
+            async () => (await api.listArticles()).articles[0]?.article_id ?? null,
+          );
+          await refresh(next.article.article_id);
+        }
       } catch (exc) {
         setError(
           exc instanceof Error
@@ -93,18 +131,33 @@ export default function App() {
         );
       }
     })();
-  }, [refresh]);
+  }, [refresh, streamWhileInProgress]);
 
   const loadGolden = () =>
     run(async () => {
-      const next = await api.loadGolden();
+      // The reset wipes the newsroom and re-submits; the first article to
+      // reappear is the golden one.
+      const next = await streamWhileInProgress(
+        () => api.loadGolden(),
+        async () => (await api.listArticles()).articles[0]?.article_id ?? null,
+      );
       await refresh(next.article.article_id);
       return "Golden article submitted: screened, decomposed, and routed to the desks.";
     });
 
   const submitOwn = (draft: SubmissionDraft) =>
     run(async () => {
-      const next = await api.submitArticle(draft);
+      const known = new Set((await api.listArticles()).articles.map((a) => a.article_id));
+      const next = await streamWhileInProgress(
+        () => api.submitArticle(draft),
+        async () => {
+          const fresh = (await api.listArticles()).articles.find((a) => !known.has(a.article_id));
+          // Close the dialog as soon as the article exists, so the user
+          // watches the desks work instead of a frozen modal.
+          if (fresh) setSubmitting(false);
+          return fresh?.article_id ?? null;
+        },
+      );
       setSubmitting(false);
       await refresh(next.article.article_id);
       const quarantined = next.security_results.filter(
@@ -233,15 +286,15 @@ export default function App() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
           <p className="max-w-md text-sm text-stone-500">
             No article in the newsroom yet. Load the golden article to run the full fleet — intake
-            screening, claim extraction, independent desks, and the editor gate — or submit a draft
-            of your own through the same pipeline.
+            screening, claim extraction, independent desks, and the editor gate — or submit your own
+            article through the same pipeline.
           </p>
           <div className="flex gap-2">
             <Button variant="primary" onClick={loadGolden} disabled={busy}>
               Load golden article
             </Button>
             <Button onClick={() => setSubmitting(true)} disabled={busy}>
-              Submit a draft
+              Submit your own article
             </Button>
           </div>
         </div>

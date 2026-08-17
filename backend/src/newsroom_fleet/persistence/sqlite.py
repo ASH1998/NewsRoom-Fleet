@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS verdicts (
     desk TEXT NOT NULL,
     result TEXT NOT NULL,
     json TEXT NOT NULL,
-    PRIMARY KEY (claim_id, desk)
+    PRIMARY KEY (article_id, claim_id, desk)
 );
 CREATE TABLE IF NOT EXISTS security_results (
     security_id TEXT PRIMARY KEY,
@@ -159,7 +159,8 @@ class SQLiteRepository:
             """
             INSERT INTO verdicts(article_id, claim_id, desk, result, json)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(claim_id, desk) DO UPDATE SET json=excluded.json, result=excluded.result
+            ON CONFLICT(article_id, claim_id, desk) DO UPDATE SET
+                json=excluded.json, result=excluded.result
             WHERE verdicts.result = ? OR verdicts.desk = ?
             """,
             (
@@ -174,9 +175,10 @@ class SQLiteRepository:
         )
         return result.rowcount > 0
 
-    def get_verdict(self, claim_id: str, desk: str) -> Verdict | None:
+    def get_verdict(self, article_id: str, claim_id: str, desk: str) -> Verdict | None:
         rows = self._query(
-            "SELECT json FROM verdicts WHERE claim_id=? AND desk=?", (claim_id, desk)
+            "SELECT json FROM verdicts WHERE article_id=? AND claim_id=? AND desk=?",
+            (article_id, claim_id, desk),
         )
         return Verdict.model_validate_json(rows[0]["json"]) if rows else None
 
