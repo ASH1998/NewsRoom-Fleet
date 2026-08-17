@@ -38,3 +38,6 @@ frontend/.vite/
 Thumbs.db
 .idea/
 .vscode/
+.tmp/
+*.mp4
+video
