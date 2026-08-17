@@ -47,22 +47,7 @@ report — the number that matters is **unsafe false verifications: 0**.
 
 ## Architecture
 
-```
-submit ──▶ Gateway + screening ──▶ Claim Extractor ──▶ Policy router
-              │ quarantine              │ atomic claims      │ minimum evidence per desk
-              ▼                         ▼                    ▼
-        SecurityResult            Claim records      Source Verifier │ Data Checker │ Standards Reviewer
-                                                            │ signed structured verdicts
-                                                            ▼
-                                              Verdict Aggregator (verdict matrix)
-                                                            ▼
-                                              Editor Gate (deterministic policy)
-                                                            ▼
-                                     editor decision → PUBLISHED → Corrections Watcher
-
-        across all stages: persistence (SQLite / Firestore), memory (approved
-        standards + precedents), append-only audit trail, OpenTelemetry spans
-```
+![arch](assets/newsroom-fleet-architecture-hackathon-v2.png)
 
 Enterprise pillars map to newsroom terms: agent registry → **Masthead**, policy
 enforcement → **Editor Gate**, persistent memory → **Corrections Ledger**,
