@@ -109,7 +109,7 @@ class Settings:
     # Matches the existing Firestore database's region (asia-south1). Keeping
     # compute next to state avoids a cross-region hop on every read.
     gcp_location: str = "asia-south1"
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-3.7-flash"
     # Gemma is the bonus model and does one bounded job (intake PII). The A4B
     # mixture-of-experts variant is the cheap end of the family — a
     # five-category classifier does not need the dense 31B.
@@ -222,7 +222,7 @@ class Settings:
             gcp_location=_first("NRF_GCP_LOCATION", default="asia-south1"),
             # GOOGLE_MODEL is this project's own .env convention for the
             # reasoning model; NRF_GEMINI_MODEL overrides it in a deployment.
-            gemini_model=_first("NRF_GEMINI_MODEL", "GOOGLE_MODEL", default="gemini-3.6-flash"),
+            gemini_model=_first("NRF_GEMINI_MODEL", "GOOGLE_MODEL", default="gemini-3.7-flash"),
             gemma_model=_first("NRF_GEMMA_MODEL", default="gemma-4-26b-a4b-it"),
             model_armor_template=os.getenv("NRF_MODEL_ARMOR_TEMPLATE") or None,
             gemini_store=os.getenv("NRF_GEMINI_STORE", "").strip().lower() in ("1", "true", "yes"),
